@@ -1,0 +1,3 @@
+<launch>
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find gcbf_qp_solver)/launch/include/default.rviz" required="true" />
+</launch>

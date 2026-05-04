@@ -1,0 +1,144 @@
+<launch>
+    <arg name="map_size_x" value="50.0"/>
+    <arg name="map_size_y" value="50.0"/>
+    <arg name="map_size_z" value=" 3.0"/>
+    <arg name="odom_topic" value="visual_slam/odom" />
+    <arg name="drone_num" value="1" />
+    <arg name="sensing_horizon" value="5.0" />
+    <arg name="control_frequence" value="200.0" />
+    <arg name="control_force_max" value="30.0" />
+    <arg name="sphere_radius" value="0.5"/>
+    <arg name="drone_radius" value="0.2"/>
+    <!-- map -->
+    <!-- <node pkg ="map_generator" name ="random_forest" type ="random_forest" output = "screen">
+        <param name="map/x_size" value="26" />
+        <param name="map/y_size" value="20" />
+        <param name="map/z_size" value="3" />
+        <param name="map/resolution" value="0.1"/>
+        <param name="ObstacleShape/seed" value="1"/>
+        <param name="map/obs_num" value="100"/>
+        <param name="ObstacleShape/lower_rad" value="0.5"/>
+        <param name="ObstacleShape/upper_rad" value="0.7"/>
+        <param name="ObstacleShape/lower_hei" value="0.0"/>
+        <param name="ObstacleShape/upper_hei" value="3.0"/>
+        <param name="map/circle_num" value="100"/>
+        <param name="ObstacleShape/radius_l" value="0.7"/>
+        <param name="ObstacleShape/radius_h" value="0.5"/>
+        <param name="ObstacleShape/z_l" value="0.7"/>
+        <param name="ObstacleShape/z_h" value="0.8"/>
+        <param name="ObstacleShape/theta" value="0.5"/>
+        <param name="pub_rate" value="1.0"/>
+        <param name="min_distance" value="0.8"/>
+    </node> -->
+	<!-- <node pkg ="map_generator" name ="random_forest" type ="random_forest" output = "screen">
+		<param name="map/x_size" value="4" />
+		<param name="map/y_size" value="4" />
+		<param name="map/z_size" value="3" />
+		<param name="map/resolution" value="0.1"/>
+		<param name="ObstacleShape/seed" value="1"/>
+		<param name="map/obs_num" value="2"/>
+		<param name="ObstacleShape/lower_rad" value="0.5"/>
+		<param name="ObstacleShape/upper_rad" value="0.7"/>
+		<param name="ObstacleShape/lower_hei" value="0.0"/>
+		<param name="ObstacleShape/upper_hei" value="3.0"/>
+		<param name="map/circle_num" value="1"/>
+		<param name="ObstacleShape/radius_l" value="0.7"/>
+		<param name="ObstacleShape/radius_h" value="0.5"/>
+		<param name="ObstacleShape/z_l" value="0.7"/>
+		<param name="ObstacleShape/z_h" value="0.8"/>
+		<param name="ObstacleShape/theta" value="0.5"/>
+		<param name="pub_rate" value="1.0"/>
+		<param name="min_distance" value="0.8"/>
+	</node> -->
+    <!-- Multiple Obstacles -->
+	<node pkg ="map_generator" name ="random_sphere_map" type ="random_sphere_map" output = "screen">
+		<param name="map/x_size" value="5" />
+		<param name="map/y_size" value="5" />
+		<param name="map/z_size" value="4" />
+		<param name="map/resolution" value="0.1"/>
+        <param name="map/useRandom" value="false"/>
+        <param name="map/seed" value="1249666148"/>
+        <!-- 233106007 1249666148 1865714487 -->
+		<param name="sphere/num" value="5"/>
+		<param name="sphere/radius" value="$(arg sphere_radius)"/>
+		<param name="pub_rate" value="1.0"/>
+	</node>
+    <!-- Single Obstacle -->
+	<!-- <node pkg ="map_generator" name ="random_sphere_map" type ="random_sphere_map" output = "screen">
+		<param name="map/x_size" value="4" />
+		<param name="map/y_size" value="4" />
+		<param name="map/z_size" value="3" />
+		<param name="map/resolution" value="0.1"/>
+        <param name="map/useRandom" value="false"/>
+        <param name="map/seed" value="2016418676"/>
+		<param name="sphere/num" value="1"/>
+		<param name="sphere/radius" value="$(arg sphere_radius)"/>
+		<param name="pub_rate" value="1.0"/>
+	</node> -->
+
+    <node pkg="task_publisher" type="task_publisher_node" name="drones_task_publisher_node" output="screen">
+        <param name="drone_num" value="$(arg drone_num)" type="int" />
+        <param name="drone_0_goal_pos_x" value="5.0" type="double" />
+        <param name="drone_0_goal_pos_y" value="2.2" type="double" />
+        <param name="drone_0_goal_pos_z" value="1.5" type="double" />
+        <!-- <param name="drone_1_goal_pos_x" value="0.0" type="double" />
+        <param name="drone_1_goal_pos_y" value="6.0" type="double" />
+        <param name="drone_1_goal_pos_z" value="1.5" type="double" /> -->
+    </node>
+
+    <!-- main algorithm params -->
+    <include file="$(find gecbf)/launch/include/advanced_param.xml">
+        <arg name="drone_num" value="$(arg drone_num)"/>
+        <arg name="sensing_horizon" value="$(arg sensing_horizon)" />
+        <arg name="control_frequence" value="$(arg control_frequence)" />
+        <arg name="drone_radius" value="$(arg drone_radius)"/>
+        <arg name="map_size_x_" value="$(arg map_size_x)"/>
+        <arg name="map_size_y_" value="$(arg map_size_y)"/>
+        <arg name="map_size_z_" value="$(arg map_size_z)"/>
+        <!-- camera pose: transform of camera frame in the world frame -->
+        <!-- depth topic: depth image, 640x480 by default -->
+        <!-- don't set cloud_topic if you already set these ones! -->
+        <!-- <arg name="camera_pose_topic" value="pcl_render_node/camera_pose"/> -->
+        <!-- <arg name="depth_topic" value="pcl_render_node/depth"/> -->
+        <!-- topic of point cloud measurement, such as from LIDAR  -->
+        <!-- don't set camera pose and depth, if you already set this one! -->
+        <!-- <arg name="cloud_topic" value="pcl_render_node/cloud"/> -->
+        <!-- intrinsic params of the depth camera -->
+        <arg name="cx" value="321.04638671875"/>
+        <arg name="cy" value="243.44969177246094"/>
+        <arg name="fx" value="387.229248046875"/>
+        <arg name="fy" value="387.229248046875"/>
+        <arg name="sphere_radius" value="$(arg sphere_radius)"/>
+    </include>
+
+    <include file="$(find gecbf)/launch/include/run_in_sim.xml">
+        <arg name="drone_id" value="0"/>
+        <arg name="init_x" value="-4.0"/>
+        <arg name="init_y" value="0.0"/>
+        <arg name="init_z" value="1.5"/>
+        <arg name="map_size_x" value="$(arg map_size_x)"/>
+        <arg name="map_size_y" value="$(arg map_size_y)"/>
+        <arg name="map_size_z" value="$(arg map_size_z)"/>
+        <arg name="sensing_horizon" value="$(arg sensing_horizon)" />
+        <arg name="control_frequence" value="$(arg control_frequence)" />
+        <arg name="control_force_max" value="$(arg control_force_max)" />
+    </include>
+    <!-- <include file="$(find gecbf)/launch/include/run_in_sim.xml">
+        <arg name="drone_id" value="1"/>
+        <arg name="init_x" value="0.0"/>
+        <arg name="init_y" value="-6.0"/>
+        <arg name="init_z" value="1.5"/>
+        <arg name="map_size_x" value="$(arg map_size_x)"/>
+        <arg name="map_size_y" value="$(arg map_size_y)"/>
+        <arg name="map_size_z" value="$(arg map_size_z)"/>
+        <arg name="sensing_horizon" value="$(arg sensing_horizon)" />
+        <arg name="control_frequence" value="$(arg control_frequence)" />
+    </include> -->
+
+    <node pkg="distance_logger" type="distance_logger_node" name="distance_logger_node" output="screen">
+        <param name="num_drones" value="$(arg drone_num)" type="int" />
+        <param name="drone_radius" value="$(arg drone_radius)" type="double" />
+        <param name="obstacle_radius" value="$(arg sphere_radius)" type="double" />
+    </node>
+
+</launch>

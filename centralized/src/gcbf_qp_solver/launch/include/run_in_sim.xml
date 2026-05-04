@@ -1,0 +1,48 @@
+<launch>
+    <!-- size of map, change the size inflate x, y, z according to your application -->
+    <arg name="drone_id" default="0"/>
+    <arg name="map_size_x"/>
+    <arg name="map_size_y"/>
+    <arg name="map_size_z"/>
+    <arg name="init_x"/>
+    <arg name="init_y"/>
+    <arg name="init_z"/>
+    <arg name="sensing_horizon" default="5.0"/>
+    <arg name="control_frequence" default="100.0" />
+    <arg name="control_force_max" default="30.0" />
+
+    <!-- <node pkg="nominal_controller" name="drone_$(arg drone_id)_nominal_controller_node" type="nominal_controller_node" output="screen">
+        <param name="drone_id" value="$(arg drone_id)" type="int"/>
+        <param name="control_frequence" value="$(arg control_frequence)" type="double"/>
+        <param name="trajectory_max_velocity" value="2.0" type="double"/>
+        <param name="trajectory_desired_accelerate" value="8.0" type="double"/>
+
+        <param name="kp_0" value="5.7" type="double" />
+        <param name="kp_1" value="5.7" type="double" />
+        <param name="kp_2" value="6.2" type="double" />
+        <param name="kd_0" value="3.4" type="double" />
+        <param name="kd_1" value="3.4" type="double" />
+        <param name="kd_2" value="4.0" type="double" />
+        <remap from="~task_pose" to="/drone_$(arg drone_id)_task_pose"/>
+        <remap from="~odom" to="/drone_$(arg drone_id)_odom"/>
+        <remap from="~ref_control" to="/drone_$(arg drone_id)_ref_control"/>
+    </node> -->
+
+    <!-- use simulator -->
+    <include file="$(find gcbf_qp_solver)/launch/include/simulator.xml">
+        <arg name="drone_id" value="$(arg drone_id)"/>
+        <arg name="sensing_horizon" value="$(arg sensing_horizon)" />
+        <arg name="map_size_x_" value="$(arg map_size_x)"/>
+        <arg name="map_size_y_" value="$(arg map_size_y)"/>
+        <arg name="map_size_z_" value="$(arg map_size_z)"/>
+        <arg name="init_x_" value="$(arg init_x)"/>
+        <arg name="init_y_" value="$(arg init_y)"/>
+        <arg name="init_z_" value="$(arg init_z)"/>
+        <arg name="max_force_" value="$(arg control_force_max)"/>
+    </include>
+    <!-- <include file="$(find manual_take_over)/launch/take_over_drone.launch">
+        <arg name="drone_id" value="$(arg drone_id)"/>
+        <arg name="cmd_topic" value="drone_$(arg drone_id)_planning/pos_cmd"/>
+    </include> -->
+</launch>
+    

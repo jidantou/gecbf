@@ -1,0 +1,119 @@
+<launch>
+    <arg name="init_x_"/>
+    <arg name="init_y_"/>
+    <arg name="init_z_"/>
+    <arg name="map_size_x_"/>
+    <arg name="map_size_y_"/>
+    <arg name="map_size_z_"/>
+    <arg name="drone_id"/>
+    <arg name="sensing_horizon"/>
+    <arg name="max_force_" default="30.0"/>
+
+    <arg name="enable_disturbance" default="false"/>
+    <arg name="disturbance_rate" default="100.0"/>
+    <arg name="dist_force_distribution" default="normal"/>
+    <arg name="dist_moment_distribution" default="normal"/>
+    <arg name="dist_random_seed" default="47"/>
+
+    <arg name="dist_force_std" default="0.3"/>
+    <arg name="dist_moment_std" default="0.03"/>
+
+    <arg name="dist_force_uniform_min" default="-1.0"/>
+    <arg name="dist_force_uniform_max" default="1.0"/>
+    <arg name="dist_moment_uniform_min" default="-0.05"/>
+    <arg name="dist_moment_uniform_max" default="0.05"/>
+
+    <node pkg="drone_dynamic" type="drone_dynamic_node" name="drone_$(arg drone_id)_quadrotor_dynamic" output="screen">
+        <param name="drone_id" value="$(arg drone_id)"/>
+        <param name="rate/odom" value="200.0"/>
+        <param name="rate/simulation" value="1000.0"/>
+        <param name="simulator/init_state_x" value="$(arg init_x_)"/>
+        <param name="simulator/init_state_y" value="$(arg init_y_)"/>
+        <param name="simulator/init_state_z" value="$(arg init_z_)"/>
+        <param name="simulator/max_force" value="$(arg max_force_)"/>
+
+        <remap from="~odom" to="/drone_$(arg drone_id)_odom"/>
+        <!-- DEBUG -->
+        <remap from="~cmd" to="/drone_$(arg drone_id)_control_cmd"/>
+        <!-- <remap from="~cmd" to="/drone_$(arg drone_id)_ref_control"/>  -->
+        <remap from="~force_disturbance" to="drone_$(arg drone_id)_force_disturbance"/>    
+        <remap from="~moment_disturbance" to="drone_$(arg drone_id)_moment_disturbance"/>        
+    </node>
+
+    <node if="$(arg enable_disturbance)"
+          pkg="disturbance_publisher"
+          type="disturbance_publisher_node"
+          name="drone_$(arg drone_id)_disturbance_publisher"
+          output="screen">
+        <param name="publish_rate" value="$(arg disturbance_rate)"/>
+        <param name="distribution_force" value="$(arg dist_force_distribution)"/>
+        <param name="distribution_moment" value="$(arg dist_moment_distribution)"/>
+        <param name="random_seed" value="$(arg dist_random_seed)"/>
+
+        <param name="force/constant_x" value="0.0"/>
+        <param name="force/constant_y" value="0.0"/>
+        <param name="force/constant_z" value="0.0"/>
+        <param name="force/mean_x" value="0.0"/>
+        <param name="force/mean_y" value="0.0"/>
+        <param name="force/mean_z" value="0.0"/>
+        <param name="force/stddev_x" value="$(arg dist_force_std)"/>
+        <param name="force/stddev_y" value="$(arg dist_force_std)"/>
+        <param name="force/stddev_z" value="$(arg dist_force_std)"/>
+        <param name="force/min_x" value="$(arg dist_force_uniform_min)"/>
+        <param name="force/min_y" value="$(arg dist_force_uniform_min)"/>
+        <param name="force/min_z" value="$(arg dist_force_uniform_min)"/>
+        <param name="force/max_x" value="$(arg dist_force_uniform_max)"/>
+        <param name="force/max_y" value="$(arg dist_force_uniform_max)"/>
+        <param name="force/max_z" value="$(arg dist_force_uniform_max)"/>
+
+        <param name="moment/constant_x" value="0.0"/>
+        <param name="moment/constant_y" value="0.0"/>
+        <param name="moment/constant_z" value="0.0"/>
+        <param name="moment/mean_x" value="0.0"/>
+        <param name="moment/mean_y" value="0.0"/>
+        <param name="moment/mean_z" value="0.0"/>
+        <param name="moment/stddev_x" value="$(arg dist_moment_std)"/>
+        <param name="moment/stddev_y" value="$(arg dist_moment_std)"/>
+        <param name="moment/stddev_z" value="$(arg dist_moment_std)"/>
+        <param name="moment/min_x" value="$(arg dist_moment_uniform_min)"/>
+        <param name="moment/min_y" value="$(arg dist_moment_uniform_min)"/>
+        <param name="moment/min_z" value="$(arg dist_moment_uniform_min)"/>
+        <param name="moment/max_x" value="$(arg dist_moment_uniform_max)"/>
+        <param name="moment/max_y" value="$(arg dist_moment_uniform_max)"/>
+        <param name="moment/max_z" value="$(arg dist_moment_uniform_max)"/>
+
+        <remap from="~force_disturbance" to="/drone_$(arg drone_id)_force_disturbance"/>
+        <remap from="~moment_disturbance" to="/drone_$(arg drone_id)_moment_disturbance"/>
+    </node>
+
+    <node pkg="odom_visualization" name="drone_$(arg drone_id)_odom_visualization" type="odom_visualization" output="screen">
+        <remap from="~odom" to="/drone_$(arg drone_id)_odom"/>
+        <param name="color/a" value="1.0"/>
+        <param name="color/r" value="0.0"/>
+        <param name="color/g" value="0.0"/>
+        <param name="color/b" value="0.0"/>
+        <param name="covariance_scale" value="100.0"/>
+        <param name="robot_scale" value="0.35"/>
+        <param name="tf45" value="false"/>
+        <param name="drone_id" value="$(arg drone_id)"/>
+    </node>
+
+    <node pkg="trajectory_visualization" name="drone_$(arg drone_id)_trajectory_visualization" type="trajectory_visualization" output="screen">
+        <remap from="~odom" to="/drone_$(arg drone_id)_odom"/>
+        <remap from="~trajectory" to="/drone_$(arg drone_id)_trajectory"/>
+        <!-- <param name="timeout" value="15.0"/> -->
+        <param name="timeout" value="-1.0"/>
+    </node>
+    <!-- <node pkg="local_sensing_node" type="pcl_render_node" name="drone_$(arg drone_id)_pcl_render_node" output="screen">
+        <rosparam command="load" file="$(find local_sensing_node)/params/camera.yaml" />
+        <param name="sensing_horizon" value="$(arg sensing_horizon)" />
+        <param name="sensing_rate" value="30.0"/>
+        <param name="estimation_rate" value="30.0"/>
+        <param name="map/x_size" value="$(arg map_size_x_)"/>
+        <param name="map/y_size" value="$(arg map_size_y_)"/>
+        <param name="map/z_size" value="$(arg map_size_z_)"/>
+        <remap from="~global_map" to="/map_generator/global_cloud"/>
+        <remap from="~odometry" to="/drone_$(arg drone_id)_odom"/>
+        <remap from="~pcl_render_node/cloud" to="/drone_$(arg drone_id)_pcl_render_node/cloud"/>
+    </node> -->
+</launch>

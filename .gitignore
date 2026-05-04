@@ -1,0 +1,6 @@
+centralized/src/.vscode/
+centralized/devel/
+centralized/build/
+centralized/build_cmd.sh
+centralized/debug.sh
+centralized/temp.txt

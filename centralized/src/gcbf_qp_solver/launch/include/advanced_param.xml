@@ -1,0 +1,51 @@
+<launch>
+    <arg name="drone_num"/>
+    <arg name="sensing_horizon"/>
+    <arg name="map_size_x_"/>
+    <arg name="map_size_y_"/>
+    <arg name="map_size_z_"/>
+    <arg name="sphere_radius"/>
+    <!-- <arg name="camera_pose_topic"/> -->
+    <!-- <arg name="depth_topic"/> -->
+    <!-- <arg name="cloud_topic"/> -->
+    <arg name="cx"/>
+    <arg name="cy"/>
+    <arg name="fx"/>
+    <arg name="fy"/>
+    <!-- <arg name="drone_id"/> -->
+    <arg name="control_frequence" default="100"/>
+
+    <!-- main node -->
+    <node pkg="gcbf_qp_solver" name="drones_gcbf_qp_node" type="gcbf_qp_solver_min_node" output="screen">
+    <!-- <node pkg="gcbf_qp_solver" name="drones_gcbf_qp_node" type="gcbf_qp_solver_node" output="screen"> -->
+        <!-- <remap from="~grid_map/odom" to="/drone_$(arg drone_id)_$(arg odometry_topic)"/> -->
+        <!-- <remap from="~grid_map/cloud" to="/drone_$(arg drone_id)_$(arg cloud_topic)"/> -->
+        <!-- <remap from="~grid_map/pose"   to = "/drone_$(arg drone_id)_$(arg camera_pose_topic)"/> -->
+        <!-- <remap from="~grid_map/depth" to = "/drone_$(arg drone_id)_$(arg depth_topic)"/> -->
+        <!-- gcbf_qp_solver -->
+        <param name="drone_num" value="$(arg drone_num)" type="int"/>
+        <!-- half of grid_map/resolution-->
+        <!-- <param name="obstacle_distances" value="0.1" type="double"/> -->
+        <param name="obstacle_distances" value="$(arg sphere_radius)" type="double"/>
+        <param name="drone_distance" value="0.1" type="double"/>
+        <param name="sensing_horizon" value="$(arg sensing_horizon)" type="double"/>
+        <param name="control_frequence" value="$(arg control_frequence)" type="double"/>
+
+        <param name="gcbf/ACC_MAX" value="5.0" type="double"/>
+        <param name="gcbf/M_DRONES" value="5" type="int"/>
+        <param name="gcbf/BETA" value="30" type="int"/>
+        <param name="gcbf/GAMMA" value="1.0" type="double"/>
+        <!-- sphere detector -->
+        <param name="sphere_detector/perception_radius" value="$(arg sensing_horizon)"/>
+        <!-- nominal controller -->
+        <param name="nominal_controller/trajectory_max_velocity" value="2.0" type="double"/>
+        <param name="nominal_controller/trajectory_desired_accelerate" value="8.0" type="double"/>
+        <param name="nominal_controller/kp_0" value="5.7" type="double" />
+        <param name="nominal_controller/kp_1" value="5.7" type="double" />
+        <param name="nominal_controller/kp_2" value="6.2" type="double" />
+        <param name="nominal_controller/kd_0" value="3.4" type="double" />
+        <param name="nominal_controller/kd_1" value="3.4" type="double" />
+        <param name="nominal_controller/kd_2" value="4.0" type="double" />
+
+    </node>
+</launch>

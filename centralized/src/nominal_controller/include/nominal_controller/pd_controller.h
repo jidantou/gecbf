@@ -50,6 +50,7 @@ private:
 
     int drone_id_;
     double TRA_V_MAX_, TRA_A_;
+    double MIN_BRAKE_DIST_;
     bool getGoal_;
 
 	double g_;

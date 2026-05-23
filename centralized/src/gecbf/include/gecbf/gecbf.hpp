@@ -73,7 +73,7 @@ namespace GECBF_QP
         double Kb_alpha_, Kb_delta_o_, Kb_delta_d_;
 
         // 约束信息，key 是约束对应的唯一id，value 是一个包含约束类型、相关参数等信息的结构体
-        std::unordered_map<uint64_t, ConstraintInfoType> active_constraints_;
+        std::unordered_map<uint64_t, ConstraintInfoType> current_constraints_;
         uint64_t next_constraint_id_ = 0;  // 用于生成唯一的约束id
 
         std::vector<Eigen::Vector3d> curCtrls_;
@@ -140,8 +140,11 @@ namespace GECBF_QP
 
         void closeLogFile();
 
+        void updateAllKbs();
+
         // DEBUG
         int debug_count;
+        std::vector<ConstraintInfoType> debug_cons_;
 
     };
     

@@ -25,7 +25,7 @@
 
     <node pkg="drone_dynamic" type="drone_dynamic_node" name="drone_$(arg drone_id)_quadrotor_dynamic" output="screen">
         <param name="drone_id" value="$(arg drone_id)"/>
-        <param name="rate/odom" value="200.0"/>
+        <param name="rate/odom" value="500.0"/>
         <param name="rate/simulation" value="1000.0"/>
         <param name="simulator/init_state_x" value="$(arg init_x_)"/>
         <param name="simulator/init_state_y" value="$(arg init_y_)"/>

@@ -16,6 +16,10 @@ PdController::PdController(ros::NodeHandle& n, const int drone_id, const double 
 	nh_.param(param_prefix + "trajectory_max_velocity", TRA_V_MAX_, 1.0);
 	nh_.param(param_prefix + "trajectory_desired_accelerate", TRA_A_, 4.0);
 
+	MIN_BRAKE_DIST_ = TRA_V_MAX_ * TRA_V_MAX_ / (2 * TRA_A_);
+	// DEBUG
+	// ROS_INFO("DEBUG: nominal: pd_control: MIN_BRAKE_DIST_ = %f", MIN_BRAKE_DIST_);
+
 	task_sub_ = nh_.subscribe("/drone_" + std::to_string(drone_id_) + "_task_pose", 10, &PdController::task_pose_callback, this);
 	odom_sub_ = nh_.subscribe("/drone_" + std::to_string(drone_id_) + "_odom", 50, &PdController::odom_callback, this);
 
@@ -60,29 +64,36 @@ void PdController::trajectoryGenerater(Eigen::Vector3d& pos_des, Eigen::Vector3d
 	Eigen::Vector3d dir = pos_goal - pos;
 
 	double dt = 1 / ctrl_fre_;
+	double dist = dir.norm();
 
-	if (dir.squaredNorm() > 1.0*1.0)
-	{
-		dir.normalize();
-		if (vel.squaredNorm() < TRA_V_MAX_*TRA_V_MAX_)
-		{
-			pos_des = pos + (vel.norm() * dt + 0.5 * TRA_A_ * dt*dt) * dir;
-			vel_des = (vel.norm() + TRA_A_ * dt) * dir;
-			// yaw_des = atan2(dir.y(), dir.x());
-		}
-		else
-		{
-			pos_des = pos + dt * TRA_V_MAX_ * dir;
-			vel_des = TRA_V_MAX_ * dir;
-			// yaw_des = atan2(dir.y(), dir.x());
-		}
-	}
-	else
+	dir.normalize();
+
+	if (dist < 0.05)										// close to the goal
+	// if (dist < -1)										// close to the goal
 	{
 		pos_des = pos_goal;
 		vel_des = vel_goal;
-		// yaw_des = atan2(2.0 * (qua_goal(1)*qua_goal(2) + qua_goal(0)*qua_goal(3)), 1.0 - 2.0 * (qua_goal(2)*qua_goal(2) + qua_goal(3)*qua_goal(3)));
+	} 
+	// else if (dist < MIN_BRAKE_DIST_)						// need to brake
+	else if (dist < 0.5)						// need to brake
+	{
+		double acc = std::min(TRA_A_, vel.squaredNorm() / (2 * dist));
+		pos_des = pos + (vel.norm() * dt - 0.5 * acc * dt*dt) * dir;
+		vel_des = (vel.norm() - acc * dt) * dir;
+	} 
+	else if (vel.squaredNorm() < TRA_V_MAX_*TRA_V_MAX_)	// can accelerate
+	{
+		pos_des = pos + (vel.norm() * dt + 0.5 * TRA_A_ * dt*dt) * dir;
+		vel_des = (vel.norm() + TRA_A_ * dt) * dir;
+		// yaw_des = atan2(dir.y(), dir.x());
 	}
+	else												// cruise at max velocity
+	{
+		pos_des = pos + dt * TRA_V_MAX_ * dir;
+		vel_des = TRA_V_MAX_ * dir;
+		// yaw_des = atan2(dir.y(), dir.x());
+	}
+
 }
 
 const Eigen::Vector3d& PdController::kp() const {

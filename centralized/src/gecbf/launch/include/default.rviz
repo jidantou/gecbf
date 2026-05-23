@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /simulation_map1
         - /simulation_map1/Autocompute Value Bounds1
         - /drone01/Mapping1
         - /drone11/Mapping1/map inflate1
@@ -94,7 +95,7 @@ Visualization Manager:
       Queue Size: 10
       Selectable: false
       Size (Pixels): 3
-      Size (m): 1
+      Size (m): 0.699999988079071
       Style: Spheres
       Topic: /sphere_generator/center_cloud
       Unreliable: false
@@ -931,7 +932,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 8.644649505615234
+      Distance: 7.358781337738037
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -939,17 +940,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.2504723072052002
-        Y: -0.1246650218963623
-        Z: -1.1979966984654311e-05
+        X: -0.068509042263031
+        Y: 0.08897876739501953
+        Z: -1.0787873179651797e-05
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3597967028617859
+      Pitch: 0.5647923946380615
       Target Frame: <Fixed Frame>
-      Yaw: 3.8714373111724854
+      Yaw: 4.0914530754089355
     Saved:
       - Class: rviz/FPS
         Enable Stereo Rendering:

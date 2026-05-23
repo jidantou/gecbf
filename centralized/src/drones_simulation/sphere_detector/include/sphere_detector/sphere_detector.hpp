@@ -19,7 +19,7 @@ public:
      * @param nh ROS节点句柄（通常为私有句柄，用于读取参数）
      * @param drone_id 无人机编号，用于构建里程计话题名称 "/drone_X_odom"
      */
-    SphereDetector(ros::NodeHandle& nh, int drone_id);
+    SphereDetector(ros::NodeHandle& nh, int drone_id, std::function<uint64_t(const int, const Eigen::Vector3d&)> on_added, std::function<void(const uint64_t)> on_removed);
 
     /**
      * @brief 获取当前位于感知半径内的球心坐标列表（只读引用）

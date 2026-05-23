@@ -11,6 +11,7 @@ using namespace GECBF_QP;
 Gecbf::Gecbf(ros::NodeHandle &nh, int drone_num = 1, double sensing_horizon = 5.0, double obstacle_distances = 0.05, double drone_distance = 0.1) {
     drone_num_ = drone_num;
     sensing_horizon_ = sensing_horizon;
+    // sensing_horizon_ = sensing_horizon*1.1;
     obstacle_size_ = obstacle_distances;
     drone_size_ = drone_distance;
 
@@ -32,20 +33,25 @@ Gecbf::Gecbf(ros::NodeHandle &nh, int drone_num = 1, double sensing_horizon = 5.
     curCtrls_.reserve(drone_num);
 
     for (int i = 0; i < drone_num; i++) {
-        local_maps_.emplace_back(nh, i);
+        local_maps_.emplace_back(nh, i, 
+            [this](const int drone_id, const Eigen::Vector3d& obstacle_pos) {
+                return this->addConstraintsCallback(drone_id, obstacle_pos);
+            }, [this](const uint64_t constraint_key) {
+                this->removeConstraintsCallback(constraint_key);
+            });
         curCtrls_.emplace_back(0.0, 0.0, MASS_ * G_);
         
         neighbors_[i].emplace(i, std::numeric_limits<uint64_t>::max());
     }
 
-    for (int i = 0; i < drone_num_; i++) {
-        local_maps_[i].regObstaclesAddCallbacks([this](const int drone_id, const Eigen::Vector3d& obstacle_pos) {
-            return this->addConstraintsCallback(drone_id, obstacle_pos);
-        });
-        local_maps_[i].regObstaclesRemoveCallbacks([this](const uint64_t constraint_key) {
-            this->removeConstraintsCallback(constraint_key);
-        });
-    }
+    // for (int i = 0; i < drone_num_; i++) {
+    //     local_maps_[i].regObstaclesAddCallbacks([this](const int drone_id, const Eigen::Vector3d& obstacle_pos) {
+    //         return this->addConstraintsCallback(drone_id, obstacle_pos);
+    //     });
+    //     local_maps_[i].regObstaclesRemoveCallbacks([this](const uint64_t constraint_key) {
+    //         this->removeConstraintsCallback(constraint_key);
+    //     });
+    // }
 
     log_opened_ = false;
 
@@ -102,27 +108,51 @@ void Gecbf::compute_h_j_obstacle(const Eigen::Vector3d& o_j,
                                 const PartStateType& state_i,
                                 Eigen::Vector2d& eta,
                                 PartStateType& dh_dot) const{
-    const Eigen::Vector3d diff = o_j - state_i.pos;
-    const double dist_sq = diff.squaredNorm();
+    const Eigen::Vector3d B = o_j - state_i.pos;          // 相对位置
+    const Eigen::Vector3d C = - state_i.vel;          // 相对速度
 
-    // h = ||o_j - p_i||^2 - (r_o + r_d)^2
-    const double sum_radii = obstacle_size_ + drone_size_;
-    const double h = dist_sq - sum_radii * sum_radii;
+    const double s = B.squaredNorm();             // s = ||p_j - p_i||^2
+    const double s0 = (obstacle_size_ + drone_size_) * (obstacle_size_ + drone_size_);          // (r_o + r_d)^2
 
-    // h_dot = -2 (o_j - p_i) · v_i
-    const double h_dot = -2.0 * diff.dot(state_i.vel);
+    // 计算 ξ(s) 和 ξ(s0)
+    const double R_sq_ = sensing_horizon_ * sensing_horizon_;
+    const double u0 = s0 / R_sq_;
+    const double u0_pow_beta = std::pow(u0, BETA_);
+    const double u0_pow_beta_p1 = u0_pow_beta * u0;
 
-    // eta = [h, h_dot]
+    // ξ(s0) = s0 + (R^2 - s0) [ (β+1) u0^β - β u0^{β+1} ]
+    const double xi_s0 = s0 + (R_sq_ - s0) * ( (BETA_ + 1.0) * u0_pow_beta - BETA_ * u0_pow_beta_p1 );
+
+    // ξ(s) 同理
+    const double u = s / R_sq_;
+    const double u_pow_beta = std::pow(u, BETA_);
+    const double u_pow_beta_p1 = u_pow_beta * u;
+    const double xi_s = s + (R_sq_ - s) * ( (BETA_ + 1.0) * u_pow_beta - BETA_ * u_pow_beta_p1 );
+
+    const double h = xi_s - xi_s0;
+
+    // 求 ξ'(s) 和 ξ''(s)
+    double xi, xi_prime, xi_double_prime;
+    compute_xi_derivatives(s, xi, xi_prime, xi_double_prime);
+
+    // h_dot = 2 * ξ'(s) * (B · C)
+    const double B_dot_C = B.dot(C);
+    const double h_dot = 2.0 * xi_prime * B_dot_C;
+
     eta(0) = h;
     eta(1) = h_dot;
 
-    // Gradient of h_dot w.r.t p_i:  2 * v_i
-    // dh_dot_dp = 2.0 * v_i;
-    dh_dot.pos = 2.0 * state_i.vel;
+    // 计算梯度
+    // dh_dot / dp_i = -4 ξ''(s) (B·C) B - 2 ξ'(s) C
+    const double coeff1 = 4.0 * xi_double_prime * B_dot_C;
+    const double coeff2 = 2.0 * xi_prime;
+    // dh_dot_dp_i = -coeff1 * B - coeff2 * C;
+    dh_dot.pos = -coeff1 * B - coeff2 * C;
 
-    // Gradient of h_dot w.r.t v_i: -2 * (o_j - p_i)
-    // dh_dot_dv = -2.0 * diff;
-    dh_dot.vel = -2.0 * diff;
+    // dh_dot / dv_i = -2 ξ'(s) B
+    // dh_dot_dv_i = -coeff2 * B;
+    dh_dot.vel = -coeff2 * B;
+
 }
 
 void Gecbf::compute_h_j_drone(const PartStateType& state_i,
@@ -187,7 +217,7 @@ void Gecbf::compute_h_j_drone(const PartStateType& state_i,
 void Gecbf::updateNeighbors(const int drone_id) {
     auto& nb_i = neighbors_[drone_id];
     const auto& p_i = drones_states_[drone_id].pos;
-    const double param = 0.8;
+    const double param = 0.9;
     // const double R2 = sensing_horizon_ * sensing_horizon_;
     const double R2 = (param*sensing_horizon_) * (param*sensing_horizon_);  // 实际执行时缩小感知半径以避免数值问题（h太小）
 
@@ -200,7 +230,7 @@ void Gecbf::updateNeighbors(const int drone_id) {
             // 已经是邻居了，检查是否还满足条件
             if ((p_i - p_j).squaredNorm() > R2) {
                 removeConstraintsCallback(it->second);
-                // active_constraints_.erase(it->second);  // 删除对应的约束
+                // current_constraints_.erase(it->second);  // 删除对应的约束
                 nb_i.erase(it);  // 从邻居列表中删除
                 neighbors_[j].erase(drone_id);  // 互相删除
             }
@@ -211,7 +241,7 @@ void Gecbf::updateNeighbors(const int drone_id) {
                 uint64_t con_id = addConstraintsCallback(drone_id, j);
                 // ConstraintInfoType new_constraint(drone_id, j);
                 // computeKb(drone_id, new_constraint.Kb);
-                // active_constraints_.emplace(next_constraint_id_, new_constraint);  // 添加新的约束
+                // current_constraints_.emplace(next_constraint_id_, new_constraint);  // 添加新的约束
 
                 nb_i.emplace(j, con_id);
                 neighbors_[j].emplace(drone_id, con_id);
@@ -219,6 +249,13 @@ void Gecbf::updateNeighbors(const int drone_id) {
         }
     }
     
+}
+
+void Gecbf::updateAllKbs() {
+    for (auto &&con : current_constraints_)
+    {
+        computeKb(con.second);
+    }
 }
 
 void Gecbf::computeKb(ConstraintInfoType& conInfo) {
@@ -235,7 +272,7 @@ void Gecbf::computeKb(ConstraintInfoType& conInfo) {
         PartStateType dh_dot;
         compute_h_j_obstacle(conInfo.o_j, drones_states_[i], eta, dh_dot);
 
-        if (eta(0) < 0) {
+        if (eta(0) < -1e-3) {
             ROS_WARN("%d:  h_j^o < 0! drone_id: %d, h = %f", debug_count, i, eta(0));
         }
 
@@ -255,7 +292,7 @@ void Gecbf::computeKb(ConstraintInfoType& conInfo) {
         PartStateType dh_dot_i, dh_dot_j;
         compute_h_j_drone(drones_states_[i], drones_states_[j], eta, dh_dot_i, dh_dot_j);
 
-        if (eta(0) < 0) {
+        if (eta(0) < -1e-3) {
             ROS_WARN("%d:  h_j^d < 0! drone_id: %d, other_id: %d, h = %f", debug_count, i, j, eta(0));
         }
 
@@ -312,13 +349,16 @@ int Gecbf::computeQPCoefficientsAl(Eigen::SparseMatrix<double>& A, Eigen::Vector
         } else {
             ROS_WARN("Failed to open log file: %s", log_path.c_str());
         }
+
+        // DEBUG
+        // updateAllKbs();
     }
 
     // 获取当前时间（秒.纳秒），避免科学计数法造成精度显示不全
     const ros::Time now = ros::Time::now();
 
     std::vector<Eigen::Triplet<double>> triplets;
-    int NUM_CONS = active_constraints_.size();
+    int NUM_CONS = current_constraints_.size();
 
     if (NUM_CONS == 0) {
         // A.resize(1, drone_num_ * 3);
@@ -335,13 +375,17 @@ int Gecbf::computeQPCoefficientsAl(Eigen::SparseMatrix<double>& A, Eigen::Vector
 
     A.resize(NUM_CONS, drone_num_ * 3);
     l.resize(NUM_CONS);
+    debug_cons_.clear();
 
     triplets.reserve(NUM_CONS * 6);
 
     int row_index = 0;
-    for (auto &&con : active_constraints_) {
+    for (auto &&con : current_constraints_) {
         const uint64_t constraint_id = con.first;
         const auto& conInfo = con.second;
+
+        // DEBUG
+        debug_cons_.emplace_back(conInfo);
 
         if (conInfo.type == OBSTACLE) {
             int i = conInfo.current_drone_id;
@@ -354,7 +398,7 @@ int Gecbf::computeQPCoefficientsAl(Eigen::SparseMatrix<double>& A, Eigen::Vector
             Eigen::Vector2d eta;
             compute_h_j_obstacle(conInfo.o_j, drones_states_[i], eta, dh_dot);
 
-            if (eta(0) < 0) {
+            if (eta(0) < -1e3) {
                 ROS_WARN("%d:  h_j^o < 0! drone_id: %d, h = %f", debug_count, i, eta(0));
             }
 
@@ -388,7 +432,7 @@ int Gecbf::computeQPCoefficientsAl(Eigen::SparseMatrix<double>& A, Eigen::Vector
             Eigen::Vector2d eta;
             compute_h_j_drone(drones_states_[i], drones_states_[j], eta, dh_dot_i, dh_dot_j);
 
-            if (eta(0) < 0) {
+            if (eta(0) < -1e3) {
                 ROS_WARN("%d:  h_j^d < 0! drone_id: %d, other_id: %d, h = %f", debug_count, i, j, eta(0));
             }
 
@@ -509,7 +553,7 @@ uint64_t Gecbf::addConstraintsCallback(const int drone_id, const Eigen::Vector3d
     computeKb(constraint_info);
     uint64_t constraint_key = next_constraint_id_;
 
-    active_constraints_.emplace(constraint_key, constraint_info);
+    current_constraints_.emplace(constraint_key, constraint_info);
     next_constraint_id_++;
     return constraint_key;
 }
@@ -519,13 +563,13 @@ uint64_t Gecbf::addConstraintsCallback(const int drone_id, const int other_drone
     computeKb(constraint_info);
     uint64_t constraint_key = next_constraint_id_;
 
-    active_constraints_.emplace(constraint_key, constraint_info);
+    current_constraints_.emplace(constraint_key, constraint_info);
     next_constraint_id_++;
     return constraint_key;
 }
 
 void Gecbf::removeConstraintsCallback(const uint64_t constraint_key) {
-    active_constraints_.erase(constraint_key);
+    current_constraints_.erase(constraint_key);
 }
 
 void Gecbf::closeLogFile() {

@@ -6,18 +6,29 @@
 
 namespace sphere_detector {
 
-SphereDetector::SphereDetector(ros::NodeHandle& nh, int drone_id)
+SphereDetector::SphereDetector(ros::NodeHandle& nh, int drone_id, std::function<uint64_t(const int, const Eigen::Vector3d&)> on_added, std::function<void(const uint64_t)> on_removed)
 {
     // 从参数服务器读取感知半径（默认 2.0 米）
     nh.param<double>("sphere_detector/perception_radius", perception_radius_, 2.0);
+    // perception_radius_ *= 1.1;
+    perception_radius_ *= 0.9;
 
 	drone_id_ = drone_id; // 存储无人机编号
+
+    onSphereAdded_ = on_added;
+    onSphereRemoved_ = on_removed;
 
     // 构造里程计话题名称
     std::string odom_topic = "/drone_" + std::to_string(drone_id) + "_odom";
 
     // 构造可视化发布话题名称（例如：/sphere_detector/drone_1/visible_spheres）
     std::string vis_topic = "/sphere_detector/drone_" + std::to_string(drone_id) + "/visible_spheres";
+
+    // 重置状态
+    all_spheres_.clear();
+    visible_spheres_.clear();
+    has_odom_ = false;
+    drone_x_ = drone_y_ = drone_z_ = 0.0;
 
     // 订阅话题
     sub_center_cloud_ = nh.subscribe("/sphere_generator/center_cloud", 1,
@@ -28,12 +39,6 @@ SphereDetector::SphereDetector(ros::NodeHandle& nh, int drone_id)
 
     // 创建发布者（队列大小1）
     pub_visible_spheres_ = nh.advertise<sensor_msgs::PointCloud2>(vis_topic, 1);
-
-    // 重置状态
-    all_spheres_.clear();
-    visible_spheres_.clear();
-    has_odom_ = false;
-    drone_x_ = drone_y_ = drone_z_ = 0.0;
 
     ROS_INFO("SphereDetector initialized for drone %d, perception radius = %.2f m, publishing to %s",
         drone_id, perception_radius_, vis_topic.c_str());

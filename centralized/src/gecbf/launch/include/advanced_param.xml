@@ -43,7 +43,7 @@
         <!-- sphere detector -->
         <param name="sphere_detector/perception_radius" value="$(arg sensing_horizon)"/>
         <!-- nominal controller -->
-        <param name="nominal_controller/trajectory_max_velocity" value="2.0" type="double"/>
+        <param name="nominal_controller/trajectory_max_velocity" value="1.0" type="double"/>
         <param name="nominal_controller/trajectory_desired_accelerate" value="8.0" type="double"/>
         <param name="nominal_controller/kp_0" value="5.7" type="double" />
         <param name="nominal_controller/kp_1" value="5.7" type="double" />
@@ -52,9 +52,9 @@
         <param name="nominal_controller/kd_1" value="3.4" type="double" />
         <param name="nominal_controller/kd_2" value="4.0" type="double" />
 
-        <param name="correction/cos_threshold" value="-0.9" type="double"/>
-        <param name="correction/vel_threshold" value="0.1" type="double"/>
-        <param name="correction/correction_force_magnitude" value="0.2" type="double"/>
+        <param name="correction/cos_threshold" value="-0.7" type="double"/>
+        <param name="correction/vel_threshold" value="0.7" type="double"/>
+        <param name="correction/correction_force_magnitude" value="0.7" type="double"/>
 
     </node>
 </launch>

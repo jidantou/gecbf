@@ -24,13 +24,20 @@ ros::Publisher center_cloud_pub;   // 球心点云（带半径强度）
 
 // 参数
 int sphere_num;          // 球体数量
-double x_size, y_size, z_size;  // 地图范围
+// 地图范围（优先使用 min/max；保留 size 作为兼容回退）
+double x_size, y_size, z_size;
+double x_min, x_max, y_min, y_max, z_min, z_max;
 double x_l, x_h, y_l, y_h, z_l_, z_h_;
 double radius;           // 球体半径（统一半径）
 double resolution;       // 采样分辨率
 double pub_rate;         // 发布频率
 int max_attempts;        // 每个球体最大随机尝试次数（不重叠时）
 bool centerSphere;       // 是否在固定位置(0,0,1.5)额外生成一个球体
+
+// 若某方向 min==max，则该轴固定，不使用随机采样
+bool x_fixed = false;
+bool y_fixed = false;
+bool z_fixed = false;
 
 // 点云数据
 pcl::PointCloud<pcl::PointXYZ> sphere_cloud;      // 球体表面点云
@@ -111,14 +118,15 @@ void generateSpheres()
         // 尝试生成不重叠的球心
         for (int attempt = 0; attempt < max_attempts; ++attempt)
         {
-            double cx = rand_x(eng);
-            double cy = rand_y(eng);
-            double cz = rand_z(eng);
+            // 若某方向 min==max，则该方向固定取值，不走随机采样
+            double cx = x_fixed ? x_l : rand_x(eng);
+            double cy = y_fixed ? y_l : rand_y(eng);
+            double cz = z_fixed ? z_l_ : rand_z(eng);
 
-            // 对齐到分辨率网格（与原代码风格一致）
-            cx = floor(cx / resolution) * resolution + resolution / 2.0;
-            cy = floor(cy / resolution) * resolution + resolution / 2.0;
-            cz = floor(cz / resolution) * resolution + resolution / 2.0;
+            // 对齐到分辨率网格（仅对随机轴对齐，固定轴保持用户给定值）
+            if (!x_fixed) cx = floor(cx / resolution) * resolution + resolution / 2.0;
+            if (!y_fixed) cy = floor(cy / resolution) * resolution + resolution / 2.0;
+            if (!z_fixed) cz = floor(cz / resolution) * resolution + resolution / 2.0;
 
             candidate = Eigen::Vector3d(cx, cy, cz);
 
@@ -151,7 +159,7 @@ void generateSpheres()
     // 可选：在固定位置添加一个中心球体
     if (centerSphere)
     {
-        const Eigen::Vector3d center_candidate(0.0, 0.0, 1.0);
+        const Eigen::Vector3d center_candidate(0.0, 0.0, 1.5);
 
         if (!isNonOverlapping(center_candidate))
         {
@@ -193,9 +201,18 @@ int main(int argc, char** argv)
 
     // 读取参数
     n.param("sphere/num", sphere_num, 10);
+    // 兼容旧参数（size）：仅用于在未提供 min/max 时推导默认值
     n.param("map/x_size", x_size, 20.0);
     n.param("map/y_size", y_size, 20.0);
     n.param("map/z_size", z_size, 5.0);
+    // 新参数（min/max）：若未设置，则回退到 size 推导的默认范围
+    if (!n.getParam("map/x_min", x_min)) x_min = -x_size / 2.0;
+    if (!n.getParam("map/x_max", x_max)) x_max =  x_size / 2.0;
+    if (!n.getParam("map/y_min", y_min)) y_min = -y_size / 2.0;
+    if (!n.getParam("map/y_max", y_max)) y_max =  y_size / 2.0;
+    // z 轴旧逻辑默认从 1.0 开始
+    if (!n.getParam("map/z_min", z_min)) z_min = 1.0;
+    if (!n.getParam("map/z_max", z_max)) z_max = z_size;
     n.param("sphere/radius", radius, 0.5);
     n.param("map/resolution", resolution, 0.1);
     n.param("pub_rate", pub_rate, 10.0);
@@ -204,28 +221,30 @@ int main(int argc, char** argv)
     n.param("sphere/max_attempts", max_attempts, 50);
     n.param("centerSphere", centerSphere, false);
 
-    // 计算边界
-    x_l = -x_size / 2.0;
-    x_h =  x_size / 2.0;
-    y_l = -y_size / 2.0;
-    y_h =  y_size / 2.0;
-    z_l_ = 0;
-    z_h_ = z_size;
+    // 计算边界：优先使用 min/max
+    // 若 min==max，则该方向固定，不随机选取；边界不做半径收缩
+    x_fixed = (x_min == x_max);
+    y_fixed = (y_min == y_max);
+    z_fixed = (z_min == z_max);
 
-    // 考虑半径边界收缩，确保球体完全在区域内
-    x_l += radius;
-    x_h -= radius;
-    y_l += radius;
-    y_h -= radius;
-    z_l_ += radius;
-    z_h_ -= radius;
+    x_l = x_min;
+    x_h = x_max;
+    y_l = y_min;
+    y_h = y_max;
+    z_l_ = z_min;
+    z_h_ = z_max;
 
-    // 如果边界无效，调整
-    if (x_l >= x_h) { x_l = -x_size/2.0; x_h = x_size/2.0; }
-    if (y_l >= y_h) { y_l = -y_size/2.0; y_h = y_size/2.0; }
-    if (z_l_ >= z_h_) { z_l_ = 0; z_h_ = z_size; }
+    // 考虑半径边界收缩，确保球体完全在区域内（仅对非固定轴且区间有效时）
+    if (!x_fixed && x_l < x_h) { x_l += radius; x_h -= radius; }
+    if (!y_fixed && y_l < y_h) { y_l += radius; y_h -= radius; }
+    if (!z_fixed && z_l_ < z_h_) { z_l_ += radius; z_h_ -= radius; }
 
-    // 初始化随机分布
+    // 如果边界收缩后无效：回退到未收缩的 min/max（保持原有“尽量生成”的风格）
+    if (!x_fixed && x_l >= x_h) { ROS_WARN("x range too small after radius shrink; falling back to [x_min, x_max] without shrink."); x_l = x_min; x_h = x_max; }
+    if (!y_fixed && y_l >= y_h) { ROS_WARN("y range too small after radius shrink; falling back to [y_min, y_max] without shrink."); y_l = y_min; y_h = y_max; }
+    if (!z_fixed && z_l_ >= z_h_) { ROS_WARN("z range too small after radius shrink; falling back to [z_min, z_max] without shrink."); z_l_ = z_min; z_h_ = z_max; }
+
+    // 初始化随机分布（即使 min==max 也能工作，但我们在采样时会绕过随机数）
     rand_x = uniform_real_distribution<double>(x_l, x_h);
     rand_y = uniform_real_distribution<double>(y_l, y_h);
     rand_z = uniform_real_distribution<double>(z_l_, z_h_);
@@ -237,6 +256,10 @@ int main(int argc, char** argv)
         seed = static_cast<unsigned int>(std::stoul(seed_given));
     // unsigned int seed = 123456789;  // 可固定种子以便复现
     ROS_INFO("Map generator: Random seed = %u", seed);
+    ROS_INFO("Map bounds (center range): x=[%.3f, %.3f] (%s), y=[%.3f, %.3f] (%s), z=[%.3f, %.3f] (%s)",
+             x_l, x_h, x_fixed ? "fixed" : "random",
+             y_l, y_h, y_fixed ? "fixed" : "random",
+             z_l_, z_h_, z_fixed ? "fixed" : "random");
     eng.seed(seed);
 
     // 创建发布者
